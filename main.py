@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ from prophet import Prophet
 import mlflow
 from mlflow.pyfunc import PythonModel
 import seaborn as sns
+import statistics
 
 class ProphetWrapper(PythonModel):
     def __init__(self, model=None):
@@ -75,6 +77,33 @@ def train_and_evaluate(df, train_size, keys_dict, experiment_id):
     plt.savefig(components_plot_path)
     log_metrics_and_artifacts(metrics, prediction_plot_path, components_plot_path, wrapped_model.model, keys_dict, experiment_id)
 
+    return metrics
+
+def aggregate_metrics(metrics_list: List[Dict[str, float]]) -> Dict[str, float]:
+    """
+    Aggregate metrics over multiple models.
+
+    Parameters
+    ----------
+    metrics_list : List[Dict[str, float]]
+        List of metrics dictionaries.
+
+    Returns
+    -------
+    Dict[str, float]
+        Aggregated metrics.
+    """
+    aggregated_metrics = {}
+    for key in metrics_list[0].keys():
+        values = [m[key] for m in metrics_list]
+        aggregated_metrics[f"{key}_mean"] = statistics.mean(values)
+        aggregated_metrics[f"{key}_median"] = statistics.median(values)
+        aggregated_metrics[f"{key}_max"] = max(values)
+        aggregated_metrics[f"{key}_min"] = min(values)
+    return aggregated_metrics
+
+
+
 def main():
     start_date = '2020-01-01'
     end_date = '2020-04-10'
@@ -84,10 +113,26 @@ def main():
         raise ValueError(f"One or more specified key columns {key_columns} do not exist in the dataframe.")
     unique_keys = df[key_columns].drop_duplicates()
     experiment_id = mlflow.get_experiment_by_name("My_Time_Series_Evaluation_With_Multiple_External_Features").experiment_id
+    metrics_list = []
     with mlflow.start_run(experiment_id=str(experiment_id), run_name="Grouped_Models"):
         for _, row in unique_keys.iterrows():
             keys_dict = row.to_dict()
-            train_and_evaluate(df, train_size, keys_dict, experiment_id)
+            metrics = train_and_evaluate(df, train_size, keys_dict, experiment_id)
+            metrics_list.append(metrics)
+
+        aggregated_metrics = aggregate_metrics(metrics_list)
+        for metric_name, metric_value in aggregated_metrics.items():
+            mlflow.log_metric(metric_name, metric_value)
+
+        df_metrics = pd.DataFrame(metrics_list)
+        for metric in df_metrics.columns:
+            plt.figure()
+            sns.histplot(df_metrics[metric], kde=True)
+            plot_path = f"./tmp/{metric}_distribution.png"
+            plt.savefig(plot_path)
+            mlflow.log_artifact(plot_path)
+
+
 
 if __name__ == "__main__":
     mlflow.set_experiment("My_Time_Series_Evaluation_With_Multiple_External_Features")
