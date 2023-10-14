@@ -42,3 +42,13 @@ Aggregates metrics over multiple runs for comprehensive analysis.
 conda install pandas numpy matplotlib scikit-learn seaborn
 conda install -c conda-forge prophet mlflow
 ```
+
+# create conda.yaml
+```
+conda env export -n time_series_forecasting > conda.yaml
+```
+
+# run
+```
+mlflow run . --experiment-name My_Time_Series_Evaluation_With_Multiple_External_Features
+```

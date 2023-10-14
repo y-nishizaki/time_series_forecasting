@@ -239,7 +239,12 @@ def main() -> None:
     if not all(key in df.columns for key in key_columns):
         raise ValueError(f"One or more specified key columns {key_columns} do not exist in the dataframe.")
     unique_keys = df[key_columns].drop_duplicates()
-    experiment_id = mlflow.get_experiment_by_name("My_Time_Series_Evaluation_With_Multiple_External_Features").experiment_id
+
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    experiment_name = 'My_Time_Series_Evaluation_With_Multiple_External_Features'
+    # experiment_name = 'Default'
+    mlflow.set_experiment(experiment_name)
+    experiment_id = mlflow.get_experiment_by_name(experiment_name).experiment_id
     metrics_list = []
     with mlflow.start_run(experiment_id=str(experiment_id), run_name="Grouped_Models"):
         for _, row in unique_keys.iterrows():
@@ -262,5 +267,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    mlflow.set_experiment("My_Time_Series_Evaluation_With_Multiple_External_Features")
     main()

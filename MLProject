@@ -1,0 +1,10 @@
+name: My_Time_Series_Evaluation_With_Multiple_External_Features
+
+conda_env: conda.yaml
+
+entry_points:
+  main:
+    parameters:
+      start_date: {type: str, default: '2020-01-01'}
+      end_date: {type: str, default: '2020-04-10'}
+    command: "python main.py"
