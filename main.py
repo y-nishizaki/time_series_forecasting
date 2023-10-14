@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple, Optional
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,18 +11,78 @@ import seaborn as sns
 import statistics
 
 class ProphetWrapper(PythonModel):
-    def __init__(self, model=None):
+    def __init__(self, model: Optional[Prophet] = None) -> None:
+        """
+        Initialize the ProphetWrapper class.
+
+        Parameters
+        ----------
+        model : Optional[Prophet]
+            Pretrained Prophet model, default is None.
+        """
         self.model = model if model else Prophet()
 
-    def fit(self, df, external_features):
+    def fit(self, df: pd.DataFrame, external_features: List[str]) -> None:
+        """
+        Fit the model to the data.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Dataframe containing the training data.
+        external_features : List[str]
+            List of external feature names to add as regressors.
+        """
         for feature in external_features:
             self.model.add_regressor(feature)
         self.model.fit(df)
 
-    def predict(self, context, model_input):
+    def predict(self, context: None, model_input: pd.DataFrame) -> pd.DataFrame:
+        """
+        Predict using the model.
+
+        Parameters
+        ----------
+        context : None
+            Not used.
+        model_input : pd.DataFrame
+            Dataframe containing features for prediction.
+
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe containing the predictions.
+        """
         return self.model.predict(model_input)
 
-def create_sample_data(n=100, start_date='2020-01-01', end_date='2020-04-10', keys1=['A', 'B'], keys2=['X', 'Y']):
+def create_sample_data(
+        n: int = 100, 
+        start_date: str = '2020-01-01', 
+        end_date: str = '2020-04-10', 
+        keys1: List[str] = ['A', 'B'], 
+        keys2: List[str] = ['X', 'Y']
+    ) -> Tuple[pd.DataFrame, int]:
+    """
+    Create sample data.
+
+    Parameters
+    ----------
+    n : int
+        Number of data points.
+    start_date : str
+        Start date in 'YYYY-MM-DD' format.
+    end_date : str
+        End date in 'YYYY-MM-DD' format.
+    keys1 : List[str]
+        List of keys for the 'KEY1' column.
+    keys2 : List[str]
+        List of keys for the 'KEY2' column.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, int]
+        Generated sample dataframe and train size.
+    """
     date_range = pd.date_range(start=start_date, end=end_date, freq='D')
     train_size = int(0.8 * len(date_range))
     df = pd.DataFrame({
@@ -35,13 +95,53 @@ def create_sample_data(n=100, start_date='2020-01-01', end_date='2020-04-10', ke
     })
     return df, train_size
 
-def calculate_metrics(y_true, y_pred):
+def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+    """
+    Calculate evaluation metrics.
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        Array of true values.
+    y_pred : np.ndarray
+        Array of predicted values.
+
+    Returns
+    -------
+    Dict[str, float]
+        Dictionary containing the calculated metrics.
+    """
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     mae = mean_absolute_error(y_true, y_pred)
     error_rate = abs((np.sum(y_true) - np.sum(y_pred)) / np.sum(y_true)) * 100
     return {'RMSE': rmse, 'MAE': mae, 'Error Rate': error_rate}
 
-def log_metrics_and_artifacts(metrics, prediction_plot_path, components_plot_path, model, keys_dict, experiment_id):
+def log_metrics_and_artifacts(
+        metrics: Dict[str, float], 
+        prediction_plot_path: str, 
+        components_plot_path: str,
+        model: Prophet, 
+        keys_dict: Dict[str, str], 
+        experiment_id: str
+    ) -> None:
+    """
+    Log metrics and artifacts.
+
+    Parameters
+    ----------
+    metrics : Dict[str, float]
+        Dictionary of metrics to log.
+    prediction_plot_path : str
+        Path to save the prediction plot.
+    components_plot_path : str
+        Path to save the components plot.
+    model : Prophet
+        Trained Prophet model.
+    keys_dict : Dict[str, str]
+        Dictionary containing keys.
+    experiment_id : str
+        ID of the mlflow experiment.
+    """
     with mlflow.start_run(experiment_id=experiment_id, run_name=f"Model_{keys_dict['KEY1']}_{keys_dict['KEY2']}", nested=True):
         for metric_name, metric_value in metrics.items():
             mlflow.log_metric(metric_name, metric_value)
@@ -51,7 +151,31 @@ def log_metrics_and_artifacts(metrics, prediction_plot_path, components_plot_pat
         wrapped_model.model = model
         mlflow.pyfunc.log_model("model", python_model=wrapped_model)
 
-def train_and_evaluate(df, train_size, keys_dict, experiment_id):
+def train_and_evaluate(
+        df: pd.DataFrame, 
+        train_size: int, 
+        keys_dict: Dict[str, str], 
+        experiment_id: str
+    ) -> Dict[str, float]:
+    """
+    Train and evaluate the model.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe containing data.
+    train_size : int
+        Size of the training set.
+    keys_dict : Dict[str, str]
+        Dictionary containing keys for subsetting.
+    experiment_id : str
+        ID of the mlflow experiment.
+
+    Returns
+    -------
+    Dict[str, float]
+        Dictionary containing evaluation metrics.
+    """
     tmp_path = './tmp'
     if not os.path.exists(tmp_path):
         os.makedirs(tmp_path)    
@@ -104,7 +228,10 @@ def aggregate_metrics(metrics_list: List[Dict[str, float]]) -> Dict[str, float]:
 
 
 
-def main():
+def main() -> None:
+    """
+    Main function to orchestrate training, evaluation and logging.
+    """
     start_date = '2020-01-01'
     end_date = '2020-04-10'
     df, train_size = create_sample_data(start_date=start_date, end_date=end_date)
