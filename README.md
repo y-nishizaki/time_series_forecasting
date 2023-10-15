@@ -50,5 +50,5 @@ conda env export -n time_series_forecasting > conda.yaml
 
 # run
 ```
-mlflow run . --experiment-name My_Time_Series_Evaluation_With_Multiple_External_Features
+mlflow run . --experiment-name My_Time_Series_Evaluation_With_Multiple_External_Features --run-name Grouped_Models
 ```
